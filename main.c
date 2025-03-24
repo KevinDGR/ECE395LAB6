@@ -2,13 +2,12 @@ void setupUART();
 unsigned char UART_read();
 void UART_write(unsigned char a);
 #define MAX_BUFFER_SIZE 100
-/*
-Modified by Bryan Galecio
-Change - Made index_num1/index_num2 local so it resets to 0 every time the program does
-Removed all indexx and ensured correct utilization of index_num1 and index_num2
-*/
 
-int memory =0;
+int memory = 0;
+unsigned char ch;
+int x;
+int y;
+int z;
 
 void uart_write_string(const char *str){
     while(*str){
@@ -54,17 +53,14 @@ void getChar(int result){
     uart_write_string(answer);
 }
 
-/*
-Modified by Bryan Galecio
-Change - Implemented backspace function for reducing repetitive code
-- Added factorial function
-- Added isPrime function
-Suggestion - create pointer functions for calculator operations
-*/
-void backspace(char* buffer, int* index){
-    if (*index > 0) { // Ensure index doesn't go below 0
-        (*index)--; // Move back in buffer
-        buffer[*index] = '\0'; // Clear the last character from the buffer
+void backspace(char* buffer, int* index_buff, char* buffer_num, int* index_num){
+    if (*index_num > 0) { // Ensure index doesn't go below 0
+        (*index_num)--; // Move back in buffer
+        buffer_num[*index_num] = '\0'; // Clear the last character from the buffer
+    }
+    if (*index_buff > 0){
+        (*index_buff)--;
+        buffer[*index_buff] = '\0';
         UART_write('\b'); // Move the cursor back
         UART_write(' '); // Overwrite the character with a space
         UART_write('\b'); // Move the cursor back again
@@ -100,31 +96,58 @@ void isPrime(int z){
     uart_write_string("\n\rPrime");
 }
 
+void mPlus(){
+    memory += z; 
+    uart_write_string(" [M+ Done]");
+}
+
+void mMinus(){
+    memory -= z; 
+    uart_write_string(" [M- Done]");
+}
+
+void mRecal(){
+    x = memory; 
+    uart_write_string(" [MR: Memory Recalled: ");
+    getChar(memory); 
+    uart_write_string("]");
+    ch = UART_read();
+}
+
+void mClear(){
+    memory = 0; 
+    uart_write_string(" [MC: Memory Cleared]");
+}
+
 int main(void){
     setupUART();
-    //uart_write_string("Solve: ");
     while(1){
         char num1[MAX_BUFFER_SIZE];
         char num2[MAX_BUFFER_SIZE];
-        unsigned char ch;
-        int x;
-        int y;
-        int z;
+        char buffer[MAX_BUFFER_SIZE];
         int index_num1 = 0;
         int index_num2 = 0;
+        int index_buffer = 0;
         uart_write_string("\n\r");
         uart_write_string("Solve: ");
         while (index_num1 < MAX_BUFFER_SIZE - 1){
             ch = UART_read();
+            buffer[index_buffer++] = ch;
+            buffer[index_buffer] = '\0';
             if (ch == '+'){
                 UART_write('+');
                 while (index_num2 < MAX_BUFFER_SIZE - 1){
                     ch = UART_read();
+                    buffer[index_buffer++] = ch;
+                    buffer[index_buffer] = '\0';
                     if (ch == '\n' || ch == '\r'){
                         break; // End of input
                     }
                     else if (ch == 0x08){ // Backspace detected
-                        backspace(num2, &index_num2);
+                        backspace(buffer, &index_buffer, num2, &index_num2);
+                        if (index_num2 == 0){
+                            break;
+                        }
                     }
                     else{
                         UART_write(ch); // Echo input to terminal
@@ -132,12 +155,14 @@ int main(void){
                         num2[index_num2] = '\0'; // Null-terminate num2
                     }
                 }
-                x = getNum(num1, index_num1);
-                y = getNum(num2, index_num2);
-                z = x + y;
-                uart_write_string("\n\r");
-                getChar(z);
-                break;
+                if (index_num2 != 0){
+                    x = getNum(num1, index_num1);
+                    y = getNum(num2, index_num2);
+                    z = x + y;
+                    uart_write_string("\n\r");
+                    getChar(z);
+                    break;
+                }
             }
             else if (ch == '-'){
                 UART_write('-');
@@ -146,34 +171,26 @@ int main(void){
                     if (ch == '\n' || ch == '\r'){
                         break;
                     }
-                    UART_write(ch);
-                    num2[index_num2++] = ch;
-                    num2[index_num2] = '\0';
-                }
-                x = getNum(num1, index_num1);
-                y = getNum(num2, index_num2);
-                z = x - y;
-                uart_write_string("\n\r");
-                getChar(z);
-                break;
-            }
-            else if (ch == '/'){
-                UART_write('/');
-                while (index_num2 < MAX_BUFFER_SIZE - 1){
-                    ch = UART_read();
-                    UART_write(ch);
-                    if (ch == '\n' || ch == '\r'){
-                        break;
+                    else if (ch == 0x08){ // Backspace detected
+                        backspace(buffer, &index_buffer, num2, &index_num2);
+                        if (index_num2 == 0){
+                            break;
+                        }
                     }
-                    num2[index_num2++] = ch;
-                    num2[index_num2] = '\0';
+                    else{
+                        UART_write(ch);
+                        num2[index_num2++] = ch;
+                        num2[index_num2] = '\0';
+                    }
                 }
-                x = getNum(num1, index_num1);
-                y = getNum(num2, index_num2);
-                z = x / y;
-                uart_write_string("\n\r");
-                getChar(z);
-                break;
+                if (index_num2 != 0){
+                    x = getNum(num1, index_num1);
+                    y = getNum(num2, index_num2);
+                    z = x - y;
+                    uart_write_string("\n\r");
+                    getChar(z);
+                    break;
+                }
             }
             else if (ch == '*'){
                 UART_write('*');
@@ -182,16 +199,54 @@ int main(void){
                     if (ch == '\n' || ch == '\r'){
                         break;
                     }
-                    UART_write(ch);
-                    num2[index_num2++] = ch;
-                    num2[index_num2] = '\0';
+                    else if (ch == 0x08){ // Backspace detected
+                        backspace(buffer, &index_buffer, num2, &index_num2);
+                        if (index_num2 == 0){
+                            break;
+                        }
+                    }
+                    else{
+                        UART_write(ch);
+                        num2[index_num2++] = ch;
+                        num2[index_num2] = '\0';
+                    }
                 }
-                x = getNum(num1, index_num1);
-                y = getNum(num2, index_num2);
-                z = x * y;
-                uart_write_string("\n\r");
-                getChar(z);
-                break;
+                if (index_num2 != 0){
+                    x = getNum(num1, index_num1);
+                    y = getNum(num2, index_num2);
+                    z = x * y;
+                    uart_write_string("\n\r");
+                    getChar(z);
+                    break;
+                }
+            }
+            else if (ch == '/'){
+                UART_write('/');
+                while (index_num2 < MAX_BUFFER_SIZE - 1){
+                    ch = UART_read();
+                    if (ch == '\n' || ch == '\r'){
+                        break;
+                    }
+                    else if (ch == 0x08){ // Backspace detected
+                        backspace(buffer, &index_buffer, num2, &index_num2);
+                        if (index_num2 == 0){
+                            break;
+                        }
+                    }
+                    else{
+                        UART_write(ch);
+                        num2[index_num2++] = ch;
+                        num2[index_num2] = '\0';
+                    }
+                }
+                if (index_num2 != 0){
+                    x = getNum(num1, index_num1);
+                    y = getNum(num2, index_num2);
+                    z = x / y;
+                    uart_write_string("\n\r");
+                    getChar(z);
+                    break;
+                }
             }
             else if (ch == '%'){
                 UART_write('%');
@@ -200,16 +255,26 @@ int main(void){
                     if (ch == '\n' || ch == '\r'){
                         break;
                     }
-                    UART_write(ch);
-                    num2[index_num2++] = ch;
-                    num2[index_num2] = '\0';
+                    else if (ch == 0x08){ // Backspace detected
+                        backspace(buffer, &index_buffer, num2, &index_num2);
+                        if (index_num2 == 0){
+                            break;
+                        }
+                    }
+                    else{
+                        UART_write(ch);
+                        num2[index_num2++] = ch;
+                        num2[index_num2] = '\0';
+                    }
                 }
-                x = getNum(num1, index_num1);
-                y = getNum(num2, index_num2);
-                z = x % y;
-                uart_write_string("\n\r");
-                getChar(z);
-                break;
+                if (index_num2 != 0){
+                    x = getNum(num1, index_num1);
+                    y = getNum(num2, index_num2);
+                    z = x % y;
+                    uart_write_string("\n\r");
+                    getChar(z);
+                    break;
+                }
             }
             else if (ch == '!'){
                 UART_write('!');
@@ -229,140 +294,158 @@ int main(void){
             }
             else if (ch == 'M') {
                 ch = UART_read(); 
-                
                 if (ch == '+') {
-                    memory += z; 
-                    uart_write_string(" [M+ Done]");
+                    mPlus();
                 } else if (ch == '-') {
-                    memory -= z; 
-                    uart_write_string(" [M- Done]");
+                    mMinus();
                 } else if (ch == 'C') {
-                    memory = 0; 
-                    uart_write_string(" [MC: Memory Cleared]");
+                   mClear();
                 } else if (ch == 'R') {
-                    x = memory; 
-                    uart_write_string(" [MR: Memory Recalled: ");
-                    getChar(memory); 
-                    uart_write_string("]");
-                    ch = UART_read();
-            if(ch == '+'){
-                UART_write('+');
-                index_num2 = 0;
-                while (index_num2 < MAX_BUFFER_SIZE - 1){
-                    ch = UART_read();
-                    UART_write(ch);
-                    index_num2 ++;
-                    num2[index_num2++] = ch;
-                    num2[index_num2] = '\0';
-                    if (ch == '\n' || ch == '\r'){
-                        break;
-                    }else if (ch == 0x08) { // Backspace detected
-                        if (index_num2 > 0) { // Ensure index_num2 doesn't go below 0
-                            index_num2--; // Move back in buffer
-                            num2[index_num2] = '\0'; // Clear the last character from the buffer
-                            UART_write('\b'); // Move the cursor back
-                            UART_write(' '); // Overwrite the character with a space
-                            UART_write('\b'); // Move the cursor back again
+                   mRecal();
+                   if (ch == '+'){
+                    UART_write('+');
+                    while (index_num2 < MAX_BUFFER_SIZE - 1){
+                        ch = UART_read();
+                        buffer[index_buffer++] = ch;
+                        buffer[index_buffer] = '\0';
+                        if (ch == '\n' || ch == '\r'){
+                            break; // End of input
+                        }
+                        else if (ch == 0x08){ // Backspace detected
+                            backspace(buffer, &index_buffer, num2, &index_num2);
+                            if (index_num2 == 0){
+                                break;
+                            }
+                        }
+                        else{
+                            UART_write(ch); // Echo input to terminal
+                            num2[index_num2++] = ch; // Add character to num2 buffer
+                            num2[index_num2] = '\0'; // Null-terminate num2
                         }
                     }
-                    
-                }
-                //x = getNum(num1, index_num1);
-                y = getNum(num2, index_num2);
-                z = x + y;
-                uart_write_string("\n\r");
-                (getChar(z));
-                break;
-            }
-            else if(ch == '-'){
-                UART_write('-');
-                int index_num2 = 0;
-                while (index_num2 < MAX_BUFFER_SIZE - 1){
-                    ch = UART_read();
-                    UART_write(ch);
-                    index_num2 ++;
-                    num2[index_num2++] = ch;
-                    num2[index_num2] = '\0';
-                    if (ch == '\n' || ch == '\r'){
+                    if (index_num2 != 0){
+                        y = getNum(num2, index_num2);
+                        z = x + y;
+                        uart_write_string("\n\r");
+                        getChar(z);
                         break;
                     }
                 }
-                
-                y = getNum(num2, index_num2);
-                z = x - y;
-                uart_write_string("\n\r");
-                (getChar(z));
-                break;
+            else if (ch == '-'){
+                UART_write('-');
+                while (index_num2 < MAX_BUFFER_SIZE - 1){
+                    ch = UART_read();
+                    if (ch == '\n' || ch == '\r'){
+                        break;
+                    }
+                    else if (ch == 0x08){ // Backspace detected
+                        backspace(buffer, &index_buffer, num2, &index_num2);
+                        if (index_num2 == 0){
+                            break;
+                        }
+                    }
+                    else{
+                        UART_write(ch);
+                        num2[index_num2++] = ch;
+                        num2[index_num2] = '\0';
+                    }
+                }
+                if (index_num2 != 0){
+                    y = getNum(num2, index_num2);
+                    z = x - y;
+                    uart_write_string("\n\r");
+                    getChar(z);
+                    break;
+                }
             }
             
-            else if(ch == '/'){
+            else if (ch == '/'){
                 UART_write('/');
-                int index_num2 = 0;
                 while (index_num2 < MAX_BUFFER_SIZE - 1){
                     ch = UART_read();
-                    UART_write(ch);
-                    index_num2 ++;
-                    num2[index_num2++] = ch;
-                    num2[index_num2] = '\0';
                     if (ch == '\n' || ch == '\r'){
                         break;
                     }
+                    else if (ch == 0x08){ // Backspace detected
+                        backspace(buffer, &index_buffer, num2, &index_num2);
+                        if (index_num2 == 0){
+                            break;
+                        }
+                    }
+                    else{
+                        UART_write(ch);
+                        num2[index_num2++] = ch;
+                        num2[index_num2] = '\0';
+                    }
                 }
-                
-                y = getNum(num2, index_num2);
-                z = x / y;
-                uart_write_string("\n\r");
-                (getChar(z));
-                break;
+                if (index_num2 != 0){
+                    y = getNum(num2, index_num2);
+                    z = x / y;
+                    uart_write_string("\n\r");
+                    getChar(z);
+                    break;
+                }
             }
 
-            else if(ch == '*'){
+            else if (ch == '*'){
                 UART_write('*');
-                int index_num2 = 0;
                 while (index_num2 < MAX_BUFFER_SIZE - 1){
                     ch = UART_read();
-                    UART_write(ch);
-                    index_num2 ++;
-                    num2[index_num2++] = ch;
-                    num2[index_num2] = '\0';
                     if (ch == '\n' || ch == '\r'){
                         break;
                     }
+                    else if (ch == 0x08){ // Backspace detected
+                        backspace(buffer, &index_buffer, num2, &index_num2);
+                        if (index_num2 == 0){
+                            break;
+                        }
+                    }
+                    else{
+                        UART_write(ch);
+                        num2[index_num2++] = ch;
+                        num2[index_num2] = '\0';
+                    }
                 }
-                
-                y = getNum(num2, index_num2);
-                z = x * y;
-                uart_write_string("\n\r");
-                (getChar(z));
-                break;
+                if (index_num2 != 0){
+                    y = getNum(num2, index_num2);
+                    z = x * y;
+                    uart_write_string("\n\r");
+                    getChar(z);
+                    break;
+                }
             }
 
-            else if(ch == '%'){
+            else if (ch == '%'){
                 UART_write('%');
-                int index_num2 = 0;
                 while (index_num2 < MAX_BUFFER_SIZE - 1){
                     ch = UART_read();
-                    UART_write(ch);
-                    index_num2 ++;
-                    num2[index_num2++] = ch;
-                    num2[index_num2] = '\0';
                     if (ch == '\n' || ch == '\r'){
                         break;
-                    } 
+                    }
+                    else if (ch == 0x08){ // Backspace detected
+                        backspace(buffer, &index_buffer, num2, &index_num2);
+                        if (index_num2 == 0){
+                            break;
+                        }
+                    }
+                    else{
+                        UART_write(ch);
+                        num2[index_num2++] = ch;
+                        num2[index_num2] = '\0';
+                    }
                 }
-                
-                y = getNum(num2, index_num2);
-                z = x % y;
-                uart_write_string("\n\r");
-                (getChar(z));
-                break;
+                if (index_num2 != 0){
+                    y = getNum(num2, index_num2);
+                    z = x % y;
+                    uart_write_string("\n\r");
+                    getChar(z);
+                    break;
+                }
             }
 
             else if(ch == '!'){
                 UART_write('!');
                 
-                
-                //y = getNum(num2, index_num2);
                 z = x;
                 for(int i = x -1; i>0; i--){
                     z = z*i; 
@@ -374,9 +457,7 @@ int main(void){
 
             else if(ch == '?'){
                 UART_write('?');
-                
-                
-                //y = getNum(num2, index_num2);
+            
                 z = x;
                 int count =0;
                 for (int i =1; i<=z; i++){
@@ -393,21 +474,13 @@ int main(void){
                 }
             
                 uart_write_string("\n\r");
-                //(getChar(z));
                 break;
             }
 
                 }
             }
             else if (ch == 0x08) { // Backspace detected
-                if (index_num2 > 0) { // Ensure index_num2 doesn't go below 0
-                    index_num2--; // Move back in buffer
-                    index_num1--; // Decrement number of valid digits in num1
-                    num1[index_num2] = '\0'; // Clear the last character from the buffer
-                    UART_write('\b'); // Move the cursor back
-                    UART_write(' '); // Overwrite the character with a space
-                    UART_write('\b'); // Move the cursor back again
-                }
+                backspace(buffer, &index_buffer, num1, &index_num1);
             }
             else{
                 UART_write(ch);

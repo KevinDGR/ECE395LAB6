@@ -4,7 +4,7 @@ void UART_write(unsigned char a);
 #define MAX_BUFFER_SIZE 100
 /*
 Modified by Bryan Galecio
-Change - Made index_num1/index_num2 local so it resets to 0 everytime the program does
+Change - Made index_num1/index_num2 local so it resets to 0 every time the program does
 Removed all indexx and ensured correct utilization of index_num1 and index_num2
 */
 
@@ -115,14 +115,7 @@ int main(void){
         uart_write_string("\n\r");
         uart_write_string("Solve: ");
         while (index_num1 < MAX_BUFFER_SIZE - 1){
-            /*
-            Modified by Bryan Galecio
-            Change - Read the first input first
-            */
             ch = UART_read();
-            UART_write(ch);
-            num1[index_num1++] = ch;
-            num1[index_num1] = '\0';
             if (ch == '+'){
                 UART_write('+');
                 while (index_num2 < MAX_BUFFER_SIZE - 1){
@@ -218,7 +211,6 @@ int main(void){
                 getChar(z);
                 break;
             }
-
             else if (ch == '!'){
                 UART_write('!');
                 x = getNum(num1, index_num1);
@@ -419,9 +411,8 @@ int main(void){
             }
             else{
                 UART_write(ch);
-                index_num1++;
-                num1[index_num2++] = ch;
-                num1[index_num2] = '\0';
+                num1[index_num1++] = ch;
+                num1[index_num1] = '\0';
             }
         }
     }
